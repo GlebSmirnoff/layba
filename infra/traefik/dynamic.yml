@@ -1,0 +1,19 @@
+http:
+  routers:
+    # Эти роуты начнут работать, когда появятся контейнеры backend/frontend (выше в compose)
+    backend:
+      rule: Host(`backend.localhost`)
+      service: backend
+    frontend:
+      rule: Host(`frontend.localhost`)
+      service: frontend
+
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "http://backend:8000"      # порт приложения внутри контейнера
+    frontend:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:3000"

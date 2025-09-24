@@ -1,0 +1,81 @@
+
+
+name: layba-dev
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PGUSER:-layba}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-layba}
+      POSTGRES_DB: ${PGDATABASE:-layba}
+    ports:
+      - "5432:5432"          # если занят — поменяешь на 5433 снаружи
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # dev: без персистентности
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"          # S3 API
+      - "9001:9001"          # Console
+    volumes:
+      - minio-data:/data
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"          # UI http://localhost:8025
+
+  traefik:
+    image: traefik:v3.0
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"            # dev only; доступен на 127.0.0.1:8080
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "127.0.0.1:8090:8080"
+    volumes:
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - mailhog
+
+  # Плейсхолдеры (подключишь позже)
+  # backend:
+  #   image: your-backend-image
+  #   labels:
+  #     traefik.http.routers.backend.rule: Host(`backend.localhost`)
+  #     traefik.http.services.backend.loadbalancer.server.port: "8000"
+  # frontend:
+  #   image: your-frontend-image
+  #   labels:
+  #     traefik.http.routers.frontend.rule: Host(`frontend.localhost`)
+  #     traefik.http.services.frontend.loadbalancer.server.port: "3000"
+
+volumes:
+  pgdata:
+  minio-data:
