@@ -1,0 +1,25 @@
+{
+  "name": "mobile",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start -c",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "gen:api": "openapi-typescript ../shared/contracts/openapi.yaml -o src/api/schema.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "expo": "~54.0.10",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "openapi-typescript": "^7.9.1",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}

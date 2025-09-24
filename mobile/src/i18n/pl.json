@@ -1,0 +1,10 @@
+{
+  "health.title": "Backend /healthz",
+  "health.status": "Status",
+  "health.requestId": "X-Request-ID",
+  "common.ok": "OK",
+  "common.error": "Błąd",
+  "nav.health": "Stan",
+  "nav.settings": "Ustawienia",
+  "nav.auth": "Logowanie"
+}

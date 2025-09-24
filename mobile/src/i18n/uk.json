@@ -1,0 +1,10 @@
+{
+  "health.title": "Бекенд /healthz",
+  "health.status": "Статус",
+  "health.requestId": "X-Request-ID",
+  "common.ok": "Гаразд",
+  "common.error": "Помилка",
+  "nav.health": "Стан",
+  "nav.settings": "Налаштування",
+  "nav.auth": "Вхід"
+}
