@@ -26,3 +26,18 @@ class SocialFacebookIn(serializers.Serializer):
 
 class SocialAppleIn(serializers.Serializer):
     id_token = serializers.CharField()
+
+# ---- OpenAPI helper: единый формат ошибки ----
+class ErrorSerializer(serializers.Serializer):
+    """
+    {
+      "code": "string",
+      "message": "string",
+      "details": { ... },
+      "request_id": "uuid"
+    }
+    """
+    code = serializers.CharField()
+    message = serializers.CharField()
+    details = serializers.DictField(required=False)
+    request_id = serializers.CharField()

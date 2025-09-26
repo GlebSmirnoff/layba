@@ -7,12 +7,14 @@ from rest_framework.response import Response
 from rest_framework.permissions import BasePermission
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework import status
+from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.types import OpenApiTypes
 
 from .serializers import (
     PhoneSendCodeIn, PhoneVerifyIn,
     EmailSendCodeIn, EmailConfirmIn,
     SessionLoginIn,
-    SocialGoogleIn, SocialFacebookIn, SocialAppleIn
+    SocialGoogleIn, SocialFacebookIn, SocialAppleIn, ErrorSerializer,
 )
 
 def _err(code:str, message:str, details:dict|None=None, http_status:int=400):
@@ -31,6 +33,11 @@ class HasSession(BasePermission):
         return bool(request.session.get("user"))
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
+@extend_schema(
+    operation_id="auth_csrf",
+    description="Issue CSRF cookie (dev)",
+    responses={200: OpenApiTypes.OBJECT},
+)
 class CsrfView(APIView):
     authentication_classes: list = []
     permission_classes: list = []
@@ -61,19 +68,30 @@ class SessionLogoutView(APIView):
         request.session.flush()
         return _ok({}, status.HTTP_204_NO_CONTENT)
 
-class ProfileMeView(APIView):
-    permission_classes = [HasSession]
+class CsrfViewDeprecated(CsrfView):
+    pass
 
-    def get(self, request):
-        user = request.session.get("user")
-        if not user:
-            return _err("unauthorized", "Authentication required", {}, 401)
-        return _ok(user, 200)
+@extend_schema(
+    responses={
+        200: OpenApiResponse(description="Current session profile"),
+        401: ErrorSerializer,
+    }
+)
+class ProfileMeView(APIView):
+     authentication_classes: list = []
+     permission_classes: list = []
+     def get(self, request):
+         user = request.session.get("user")
+         if not user:
+             return _err("unauthorized", "Authentication required", {}, 401)
+         return _ok(user, 200)
 
 class PhoneSendCodeView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "phone_send_code"
 
+    @extend_schema(
+        responses={204: OpenApiResponse(description="Code sent"), 400: ErrorSerializer, 429: ErrorSerializer})
     def post(self, request):
         ser = PhoneSendCodeIn(data=request.data)
         if not ser.is_valid():
@@ -82,6 +100,7 @@ class PhoneSendCodeView(APIView):
         return _ok({}, status.HTTP_204_NO_CONTENT)
 
 class PhoneVerifyView(APIView):
+    @extend_schema(responses={200: OpenApiResponse(description="Authorized"), 400: ErrorSerializer})
     def post(self, request):
         ser = PhoneVerifyIn(data=request.data)
         if not ser.is_valid():
@@ -95,6 +114,8 @@ class EmailSendCodeView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "email_send_code"
 
+    @extend_schema(
+        responses={204: OpenApiResponse(description="Email sent"), 400: ErrorSerializer, 429: ErrorSerializer})
     def post(self, request):
         ser = EmailSendCodeIn(data=request.data)
         if not ser.is_valid():
@@ -103,6 +124,7 @@ class EmailSendCodeView(APIView):
         return _ok({}, status.HTTP_204_NO_CONTENT)
 
 class EmailConfirmView(APIView):
+    @extend_schema(responses={200: OpenApiResponse(description="Email confirmed"), 400: ErrorSerializer})
     def post(self, request):
         ser = EmailConfirmIn(data=request.data)
         if not ser.is_valid():
@@ -111,6 +133,7 @@ class EmailConfirmView(APIView):
         return _ok({"email_confirmed": True}, 200)
 
 class SocialGoogleView(APIView):
+    @extend_schema(responses={200: OpenApiResponse(description="Google profile"), 400: ErrorSerializer})
     def post(self, request):
         ser = SocialGoogleIn(data=request.data)
         if not ser.is_valid():
@@ -118,6 +141,7 @@ class SocialGoogleView(APIView):
         return _ok({"provider": "google", "profile": {"email": "user@example.com"}}, 200)
 
 class SocialFacebookView(APIView):
+    @extend_schema(responses={200: OpenApiResponse(description="Facebook profile"), 400: ErrorSerializer})
     def post(self, request):
         ser = SocialFacebookIn(data=request.data)
         if not ser.is_valid():
@@ -125,12 +149,14 @@ class SocialFacebookView(APIView):
         return _ok({"provider": "facebook", "profile": {"email": "user@example.com"}}, 200)
 
 class SocialAppleView(APIView):
+    @extend_schema(responses={200: OpenApiResponse(description="Apple profile"), 400: ErrorSerializer})
     def post(self, request):
         ser = SocialAppleIn(data=request.data)
         if not ser.is_valid():
             return _err("validation_error", "Invalid payload", ser.errors, 400)
         return _ok({"provider": "apple", "profile": {"email": "user@example.com"}}, 200)
 
+@extend_schema(responses={200: OpenApiResponse(description="Moderator settings"), 401: ErrorSerializer, 403: ErrorSerializer})
 class ModeratorNotificationSettingsView(APIView):
     def get(self, request):
         user = request.session.get("user")
@@ -141,6 +167,7 @@ class ModeratorNotificationSettingsView(APIView):
         # dev stub
         return _ok({"email": True, "sms": False}, 200)
 
+    @extend_schema(responses={200: OpenApiResponse(description="Saved"), 401: ErrorSerializer, 403: ErrorSerializer})
     def put(self, request):
         user = request.session.get("user")
         if not user:

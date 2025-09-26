@@ -3,6 +3,53 @@ info:
   title: Layba API
   version: 0.1.0
 paths:
+  /api/notifications/settings/:
+    get:
+      operationId: api_notifications_settings_retrieve
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Moderator settings
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+    put:
+      operationId: api_notifications_settings_update
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Saved
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
   /api/schema:
     get:
       operationId: api_schema_retrieve
@@ -149,7 +196,231 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /auth/csrf/:
+    get:
+      operationId: auth_csrf
+      description: Issue CSRF cookie (dev)
+      tags:
+      - auth
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /auth/email/confirm:
+    post:
+      operationId: auth_email_confirm_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Email confirmed
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /auth/email/send_code:
+    post:
+      operationId: auth_email_send_code_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: Email sent
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /auth/phone/send_code:
+    post:
+      operationId: auth_phone_send_code_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: Code sent
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /auth/phone/verify:
+    post:
+      operationId: auth_phone_verify_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Authorized
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /auth/session/login:
+    post:
+      operationId: auth_session_login_create
+      tags:
+      - auth
+      responses:
+        '200':
+          description: No response body
+  /auth/session/logout:
+    post:
+      operationId: auth_session_logout_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /auth/social/apple:
+    post:
+      operationId: auth_social_apple_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Apple profile
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /auth/social/facebook:
+    post:
+      operationId: auth_social_facebook_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Facebook profile
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /auth/social/google:
+    post:
+      operationId: auth_social_google_create
+      tags:
+      - auth
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          description: Google profile
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+  /csrf/:
+    get:
+      operationId: auth_csrf_2
+      description: Issue CSRF cookie (dev)
+      tags:
+      - csrf
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profile/me:
+    get:
+      operationId: profile_me_retrieve
+      tags:
+      - profile
+      responses:
+        '200':
+          description: Current session profile
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
 components:
+  schemas:
+    Error:
+      type: object
+      description: |-
+        {
+          "code": "string",
+          "message": "string",
+          "details": { ... },
+          "request_id": "uuid"
+        }
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: {}
+        request_id:
+          type: string
+      required:
+      - code
+      - message
+      - request_id
   securitySchemes:
     basicAuth:
       type: http
