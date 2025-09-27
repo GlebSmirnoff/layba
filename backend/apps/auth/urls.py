@@ -26,4 +26,9 @@ urlpatterns = [
     path("social/google", SocialGoogleView.as_view(), name="auth-social-google"),
     path("social/facebook", SocialFacebookView.as_view(), name="auth-social-facebook"),
     path("social/apple", SocialAppleView.as_view(), name="auth-social-apple"),
+
+    # Moderator
+    path("../api/notifications/settings/",  # note: mounted at /auth/, so we go absolute in config/urls also
+         ModeratorNotificationSettingsView.as_view(),
+         name="moderator-notifications-settings"),
 ]
