@@ -43,7 +43,8 @@ services:
     image: mailhog/mailhog:latest
     restart: unless-stopped
     ports:
-      - "8025:8025"          # UI http://localhost:8025
+      - "1025:1025"   # SMTP для Django
+      - "8025:8025"   # Web UI
 
   traefik:
     image: traefik:v3.0

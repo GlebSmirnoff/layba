@@ -143,10 +143,13 @@ CSRF_COOKIE_SAMESITE = "Lax"
 # DRF + OpenAPI
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication", ],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {
         "phone_send_code": "5/hour",
         "phone_verify": "10/minute",
+        "email_send_code": "5/hour",
+        "email_confirm": "10/minute",
     },
 }
 # Dev hint for CALL method (optional)
@@ -161,15 +164,18 @@ SPECTACULAR_SETTINGS = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {
-        "simple": {"format": "[%(levelname)s] %(name)s: %(message)s"},
-    },
-    "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
-    },
+    "formatters": {"simple": {"format": "[%(levelname)s] %(name)s: %(message)s"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
     "loggers": {
         "PHONE_SMS": {"handlers": ["console"], "level": "INFO", "propagate": False},
         "PHONE_CALL": {"handlers": ["console"], "level": "INFO", "propagate": False},
-        "auth":       {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "EMAIL_CODE": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "1025"))
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = False
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@layba.local")

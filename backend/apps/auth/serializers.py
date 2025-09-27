@@ -26,11 +26,16 @@ class PhoneVerifyIn(serializers.Serializer):
             raise serializers.ValidationError("Provide only one of 'code' or 'last4'")
         return attrs
 
+class LowerEmailField(serializers.EmailField):
+    def to_internal_value(self, data):
+        return super().to_internal_value(data).strip().lower()
+
 class EmailSendCodeIn(serializers.Serializer):
-    email = serializers.EmailField()
+    email = LowerEmailField()
 
 class EmailConfirmIn(serializers.Serializer):
-    code = serializers.CharField()
+    email = LowerEmailField()
+    code = serializers.CharField(min_length=6, max_length=6)
 
 class SessionLoginIn(serializers.Serializer):
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)
@@ -59,3 +64,4 @@ class ErrorSerializer(serializers.Serializer):
     message = serializers.CharField()
     details = serializers.DictField(required=False)
     request_id = serializers.CharField(required=False, allow_blank=True)
+

@@ -15,7 +15,7 @@ from .serializers import (
     SessionLoginIn, ErrorSerializer,
     SocialGoogleIn, SocialFacebookIn, SocialAppleIn
 )
-from .services import issue_phone_code, verify_phone_code
+from .services import issue_phone_code, verify_phone_code, issue_email_code, confirm_email_code
 from .models import PhoneVerificationCode
 
 def _error(code: str, message: str, details=None, status_code=status.HTTP_400_BAD_REQUEST):
@@ -134,23 +134,49 @@ class PhoneVerifyView(APIView):
         return Response(res.user_payload, status=status.HTTP_200_OK)
 
 class EmailSendCodeView(APIView):
-    throttle_classes = [ScopedRateThrottle]
+    permission_classes = [permissions.AllowAny]
     throttle_scope = "email_send_code"
 
+    @extend_schema(
+        request=EmailSendCodeIn,
+        responses={204: OpenApiResponse(description="No Content"), 400: ErrorSerializer, 429: ErrorSerializer}
+    )
     def post(self, request):
-        ser = EmailSendCodeIn(data=request.data)
-        if not ser.is_valid():
-            return _error("validation_error", "Invalid payload", ser.errors, 400)
-        # dev stub: in dev it "goes" to Mailhog
-        return _ok({}, status.HTTP_204_NO_CONTENT)
+        s = EmailSendCodeIn(data=request.data)
+        if not s.is_valid():
+            return _error("validation_error", "Invalid payload", s.errors, status.HTTP_400_BAD_REQUEST)
+        d = s.validated_data
+        try:
+            issue_email_code(email=d["email"], ip=request.META.get("REMOTE_ADDR"), ua=request.META.get("HTTP_USER_AGENT"))
+        except Exception:
+            return _error("email_send_failed", "Could not send email", status_code=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class EmailConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_scope = "email_confirm"
+
+    @extend_schema(
+        request=EmailConfirmIn,
+        responses={200: OpenApiResponse(description="OK"), 400: ErrorSerializer, 401: ErrorSerializer, 410: ErrorSerializer, 429: ErrorSerializer}
+    )
     def post(self, request):
-        ser = EmailConfirmIn(data=request.data)
-        if not ser.is_valid():
-            return _error("validation_error", "Invalid payload", ser.errors, 400)
-        # dev stub: mark as confirmed (no-op)
-        return _ok({"email_confirmed": True}, 200)
+        s = EmailConfirmIn(data=request.data)
+        if not s.is_valid():
+            return _error("validation_error", "Invalid payload", s.errors, status.HTTP_400_BAD_REQUEST)
+        v = s.validated_data
+        res = confirm_email_code(email=v["email"], code=v["code"])
+        if not res.ok:
+            if res.reason == "not_found_or_expired":
+                return _error("gone", "Code expired or not found", status_code=status.HTTP_410_GONE)
+            if res.reason == "too_many_attempts":
+                return _error("too_many_attempts", "Too many attempts", status_code=status.HTTP_429_TOO_MANY_REQUESTS)
+            return _error("unauthorized", "Wrong code", status_code=status.HTTP_401_UNAUTHORIZED)
+
+        # web-session (как и в phone)
+        request.session["user"] = {"id": res.user_payload["id"], "email": res.user_payload["email"], "role": "user"}
+        request.session.save()
+        return Response(res.user_payload, status=status.HTTP_200_OK)
 
 class SocialGoogleView(APIView):
     def post(self, request):
