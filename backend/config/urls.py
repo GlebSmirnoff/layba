@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+
 from apps.auth.views import ProfileMeView, CsrfView, ModeratorNotificationSettingsView
 
 urlpatterns = [
@@ -8,12 +10,11 @@ urlpatterns = [
     path("", include("health.urls")),
     path("api/schema", SpectacularAPIView.as_view(), name="schema"),
     path("api/schema/swagger", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
-
-path("auth/", include("apps.auth.urls")),
+      # Auth bundle
+    path("auth/", include("apps.auth.urls")),
+    # Public non-auth-prefixed endpoints (per contract)
     path("profile/me", ProfileMeView.as_view(), name="profile-me"),
-    path("csrf/", CsrfView.as_view(), name="csrf"),
+    path('auth/csrf/', CsrfView.as_view(), name='csrf'),
     path("api/notifications/settings/", ModeratorNotificationSettingsView.as_view(),
-         name="moderator-notifications-settings"),
-
+        name = "moderator-notifications-settings"),
 ]
-

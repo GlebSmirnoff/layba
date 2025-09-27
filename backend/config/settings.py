@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "health",
-    "apps.auth"
+    "apps.auth.apps.AuthConfig",
 ]
 
 MIDDLEWARE = [
@@ -131,6 +131,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://frontend.localhost"]
 CORS_ALLOWED_ORIGINS = [
     "http://frontend.localhost",
     "http://localhost:3000",
@@ -145,11 +146,30 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {
         "phone_send_code": "5/hour",
-        "email_send_code": "5/hour",
+        "phone_verify": "10/minute",
     },
 }
+# Dev hint for CALL method (optional)
+DEV_FAKE_CALLER_LAST4 = os.environ.get("DEV_FAKE_CALLER_LAST4", "")
+
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Layba API",
     "VERSION": "0.1.0",
+}
+# --- Dev logging for phone flow ---
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {"format": "[%(levelname)s] %(name)s: %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+    },
+    "loggers": {
+        "PHONE_SMS": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "PHONE_CALL": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "auth":       {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
 }
