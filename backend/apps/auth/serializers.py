@@ -12,12 +12,14 @@ class E164Field(serializers.CharField):
 
 class PhoneSendCodeIn(serializers.Serializer):
     phone = E164Field()
-    method = serializers.ChoiceField(choices=["sms", "call"])
+    method = serializers.ChoiceField(choices=["sms", "call"], default="sms")
 
 class PhoneVerifyIn(serializers.Serializer):
-    phone = E164Field()
-    code = serializers.CharField(required=False, allow_blank=True)
-    last4 = serializers.CharField(required=False, allow_blank=True, max_length=4)
+    phone = serializers.CharField()
+    # для sms
+    code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    # для call
+    last4 = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate(self, attrs):
         if not attrs.get("code") and not attrs.get("last4"):
@@ -34,8 +36,8 @@ class EmailSendCodeIn(serializers.Serializer):
     email = LowerEmailField()
 
 class EmailConfirmIn(serializers.Serializer):
-    email = LowerEmailField()
-    code = serializers.CharField(min_length=6, max_length=6)
+    email = serializers.EmailField()
+    code = serializers.CharField()
 
 class SessionLoginIn(serializers.Serializer):
     email = serializers.EmailField(required=False, allow_null=True, allow_blank=True)

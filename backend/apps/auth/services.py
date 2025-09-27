@@ -1,222 +1,208 @@
 import logging
 import random
-import re
-from dataclasses import dataclass
+from datetime import timedelta
 from typing import Optional, Tuple
 
-from django.core.mail import EmailMessage
-from django.db import transaction
 from django.utils import timezone
-from django.conf import settings
 
 from .models import PhoneVerificationCode, EmailVerificationCode
 
-logger_sms = logging.getLogger("PHONE_SMS")
-logger_call = logging.getLogger("PHONE_CALL")
-logger_email = logging.getLogger("EMAIL_CODE")
+# отдельные логгеры, чтобы в dev удобно фильтровать
+log_sms = logging.getLogger("PHONE_SMS")
+log_call = logging.getLogger("PHONE_CALL")
+log_email = logging.getLogger("EMAIL_CODE")
 
-E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
-TTL_MINUTES = 10
+TTL_MIN = 10
 MAX_ATTEMPTS = 5
 
 
-def _mask(phone: str) -> str:
-    # +380******123
-    return phone[:-3].replace(phone[4:-3], "*" * max(0, len(phone[4:-3]))) + phone[-3:]
+# ----- helpers -----
+def _now():
+    return timezone.now()
 
 
-def _generate_code() -> str:
-    return f"{random.randint(0, 999999):06d}"
+def _ttl():
+    return _now() + timedelta(minutes=TTL_MIN)
 
 
-@dataclass
-class IssueResult:
-    record: PhoneVerificationCode
-    created: bool
+def _mask_phone(p: str) -> str:
+    p = p or ""
+    if len(p) <= 4:
+        return "***"
+    return f"{p[:2]}***{p[-2:]}"
 
 
-def issue_phone_code(*, phone: str, method: str, ip: Optional[str], ua: Optional[str]) -> IssueResult:
-    if not E164_RE.match(phone):
-        raise ValueError("Invalid E.164 phone")
+def _mask_email(e: str) -> str:
+    if not e:
+        return "***"
+    e = e.lower()
+    try:
+        local, domain = e.split("@", 1)
+    except ValueError:
+        return "***"
+    local_m = (local[:1] + "***") if local else "***"
+    domain_m = (domain[:1] + "***") if domain else "***"
+    return f"{local_m}@{domain_m}"
 
-    now = timezone.now()
-    expires_at = now + timezone.timedelta(minutes=TTL_MINUTES)
 
-    # reuse active not-used code for the same phone/method
+# ----- PHONE -----
+def issue_phone_code(
+    phone: str, method: str, ip: Optional[str], ua: Optional[str]
+) -> PhoneVerificationCode:
+    phone = phone.strip()
+    method = (method or "sms").lower()
+
     existing = (
         PhoneVerificationCode.objects.filter(
-            phone_e164=phone, method=method, used=False, expires_at__gt=now
+            phone_e164=phone, method=method, used=False, expires_at__gt=_now()
         )
         .order_by("-created_at")
         .first()
     )
     if existing:
-        rec = existing
-        created = False
+        # для idempotency возвращаем активную запись
+        return existing
+
+    if method == "sms":
+        code = f"{random.randint(0, 999999):06d}"
+        last4 = None
+    elif method == "call":
+        code = None
+        last4 = phone[-4:] if len(phone) >= 4 else None
     else:
-        rec = PhoneVerificationCode(
-            phone_e164=phone,
-            method=method,
-            expires_at=expires_at,
-            ip=ip,
-            ua=ua[:256] if ua else None,
+        method = "sms"
+        code = f"{random.randint(0, 999999):06d}"
+        last4 = None
+
+    rec = PhoneVerificationCode.objects.create(
+        phone_e164=phone,
+        method=method,
+        code=code,
+        last4_expected=last4,
+        expires_at=_ttl(),
+        used=False,
+        attempts=0,
+        ip=ip or "",
+        ua=ua or "",
+    )
+
+    # dev-«отправка»
+    if method == "sms" and code:
+        log_sms.info("phone_send_code sms to %s code=%s", _mask_phone(phone), code)
+    if method == "call" and last4:
+        log_call.info(
+            "phone_send_code call to %s expect_last4=%s", _mask_phone(phone), last4
         )
-        if method == PhoneVerificationCode.Method.SMS:
-            rec.code = _generate_code()
-        else:
-            # CALL: ожидаем последние 4 цифры
-            hint = getattr(settings, "DEV_FAKE_CALLER_LAST4", None)
-            rec.last4_expected = hint or phone[-4:]
-        rec.save()
-        created = True
 
-    # dev "sending"
-    if method == PhoneVerificationCode.Method.SMS:
-        logger_sms.info("send sms code=%s to %s", rec.code, _mask(phone))
-    else:
-        logger_call.info("expect last4=%s for %s", rec.last4_expected, _mask(phone))
-
-    return IssueResult(record=rec, created=created)
+    return rec
 
 
-@dataclass
-class VerifyResult:
-    ok: bool
-    reason: Optional[str]
-    user_payload: Optional[dict]
+def verify_phone_code(
+    phone: str, code: Optional[str] = None, last4: Optional[str] = None
+) -> Tuple[dict, PhoneVerificationCode]:
+    phone = phone.strip()
 
-
-@transaction.atomic
-def verify_phone_code(*, phone: str, code: Optional[str], last4: Optional[str]) -> VerifyResult:
-    now = timezone.now()
-
+    # определяем метод из входных полей
     if code:
-        method = PhoneVerificationCode.Method.SMS
-        qs = PhoneVerificationCode.objects.select_for_update().filter(
-            phone_e164=phone, method=method, used=False, expires_at__gt=now
+        method = "sms"
+        q = PhoneVerificationCode.objects.filter(
+            phone_e164=phone, method="sms", used=False, expires_at__gt=_now()
         )
     else:
-        method = PhoneVerificationCode.Method.CALL
-        qs = PhoneVerificationCode.objects.select_for_update().filter(
-            phone_e164=phone, method=method, used=False, expires_at__gt=now
+        method = "call"
+        q = PhoneVerificationCode.objects.filter(
+            phone_e164=phone, method="call", used=False, expires_at__gt=_now()
         )
 
-    rec = qs.order_by("-created_at").first()
+    rec = q.order_by("-created_at").first()
     if not rec:
-        return VerifyResult(ok=False, reason="not_found_or_expired", user_payload=None)
+        raise ValueError("gone")  # истёк или не найден
 
     if rec.attempts >= MAX_ATTEMPTS:
-        return VerifyResult(ok=False, reason="too_many_attempts", user_payload=None)
+        raise PermissionError("too_many_attempts")
 
     ok = False
-    if method == PhoneVerificationCode.Method.SMS:
-        ok = (code == rec.code)
-    else:
-        ok = (last4 == rec.last4_expected)
+    if method == "sms" and rec.code and code:
+        ok = (rec.code or "").strip() == code.strip()
+    if method == "call" and rec.last4_expected and last4:
+        ok = (rec.last4_expected or "").strip() == last4.strip()
 
     if not ok:
-        rec.attempts += 1
+        rec.attempts = rec.attempts + 1
         rec.save(update_fields=["attempts"])
-        return VerifyResult(ok=False, reason="wrong_code", user_payload=None)
+        raise PermissionError("unauthorized")
 
-    # success
     rec.used = True
-    rec.used_at = now
+    rec.used_at = _now()
     rec.save(update_fields=["used", "used_at"])
 
-    # dev "user"
-    payload = {
-        "id": rec.id,  # временно id = id записи для простоты
-        "phone": phone,
+    # в проекте используется легковесная «сессия-модель» пользователя
+    # (без реальной БД-пользователей). Возвращаем dict.
+    user = {
+        "id": 1,
+        "email": "phone-user@example.com",
         "role": "user",
     }
-    return VerifyResult(ok=True, reason=None, user_payload=payload)
+    return user, rec
 
-def _mask_email(email: str) -> str:
-    try:
-        user, dom = email.split("@", 1)
-    except ValueError:
-        return email
-    um = (user[:1] or "*") + "***"
-    dm = (dom[:1] or "*") + "***"
-    return f"{um}@{dm}"
 
-@dataclass
-class IssueEmailResult:
-    record: EmailVerificationCode
-    created: bool
+# ----- EMAIL -----
+def issue_email_code(email: str, ip: Optional[str], ua: Optional[str]) -> EmailVerificationCode:
+    email = (email or "").strip().lower()
 
-def _generate_email_code() -> str:
-    return f"{random.randint(0, 999999):06d}"
-
-def issue_email_code(*, email: str, ip: Optional[str], ua: Optional[str]) -> IssueEmailResult:
-    now = timezone.now()
-    expires_at = now + timezone.timedelta(minutes=TTL_MINUTES)
-    # reuse active
     existing = (
-        EmailVerificationCode.objects.filter(email=email, used=False, expires_at__gt=now)
+        EmailVerificationCode.objects.filter(
+            email=email, used=False, expires_at__gt=_now()
+        )
         .order_by("-created_at")
         .first()
     )
     if existing:
-        rec = existing
-        created = False
-    else:
-        rec = EmailVerificationCode(
-            email=email,
-            code=_generate_email_code(),
-            expires_at=expires_at,
-            ip=ip or "",
-            ua=(ua or "")[:256],
-        )
-        rec.save()
-        created = True
+        return existing
 
-    # send via Django email backend (Mailhog in dev)
-    subject = "Layba: ваш код подтверждения"
-    body = f"Ваш код: {rec.code} (действует 10 минут)."
-    msg = EmailMessage(
-        subject=subject,
-        body=body,
-        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@layba.local"),
-        to=[email],
+    code = f"{random.randint(0, 999999):06d}"
+    rec = EmailVerificationCode.objects.create(
+        email=email,
+        code=code,
+        expires_at=_ttl(),
+        used=False,
+        attempts=0,
+        ip=ip or "",
+        ua=ua or "",
     )
-    try:
-        msg.send(fail_silently=True)
-    finally:
-        logger_email.info("email code sent to %s", _mask_email(email))
 
-    return IssueEmailResult(record=rec, created=created)
+    log_email.info("email_send_code to %s code=%s", _mask_email(email), code)
+    return rec
 
-@dataclass
-class ConfirmEmailResult:
-    ok: bool
-    reason: Optional[str]
-    user_payload: Optional[dict]
 
-@transaction.atomic
-def confirm_email_code(*, email: str, code: str) -> ConfirmEmailResult:
-    now = timezone.now()
+def confirm_email_code(email: str, code: str) -> Tuple[dict, EmailVerificationCode]:
+    email = (email or "").strip().lower()
+
     rec = (
-        EmailVerificationCode.objects.select_for_update()
-        .filter(email=email, used=False, expires_at__gt=now)
+        EmailVerificationCode.objects.filter(
+            email=email, used=False, expires_at__gt=_now()
+        )
         .order_by("-created_at")
         .first()
     )
     if not rec:
-        return ConfirmEmailResult(ok=False, reason="not_found_or_expired", user_payload=None)
+        raise ValueError("gone")
 
     if rec.attempts >= MAX_ATTEMPTS:
-        return ConfirmEmailResult(ok=False, reason="too_many_attempts", user_payload=None)
+        raise PermissionError("too_many_attempts")
 
-    if rec.code != code:
-        rec.attempts += 1
+    if (rec.code or "").strip() != (code or "").strip():
+        rec.attempts = rec.attempts + 1
         rec.save(update_fields=["attempts"])
-        return ConfirmEmailResult(ok=False, reason="wrong_code", user_payload=None)
+        raise PermissionError("unauthorized")
 
     rec.used = True
-    rec.used_at = now
+    rec.used_at = _now()
     rec.save(update_fields=["used", "used_at"])
 
-    payload = {"id": rec.id, "email": rec.email, "role": "user"}
-    return ConfirmEmailResult(ok=True, reason=None, user_payload=payload)
+    user = {
+        "id": 2,
+        "email": email,
+        "role": "user",
+    }
+    return user, rec
