@@ -2,9 +2,11 @@ http:
   routers:
     # Эти роуты начнут работать, когда появятся контейнеры backend/frontend (выше в compose)
     backend:
+      entryPoints: [ web ]
       rule: Host(`backend.localhost`)
       service: backend
     frontend:
+      entryPoints: [ web ]
       rule: Host(`frontend.localhost`)
       service: frontend
 
@@ -12,8 +14,8 @@ http:
     backend:
       loadBalancer:
         servers:
-          - url: "http://backend:8000"      # порт приложения внутри контейнера
+          - url: "http://host.docker.internal:8000"      # порт приложения внутри контейнера
     frontend:
       loadBalancer:
         servers:
-          - url: "http://frontend:3000"
+          - url: "http://host.docker.internal:3000"

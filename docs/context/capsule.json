@@ -1,0 +1,50 @@
+
+
+{
+  "version": "0.1",
+  "services": {
+    "backend": {"host": "backend.localhost", "port": 8000, "health": "/healthz", "readiness": "/readiness", "schema": "/api/schema"},
+    "frontend": {"host": "frontend.localhost", "port": 3000},
+    "traefik": {"dashboard": "http://127.0.0.1:8090"},
+    "postgres": {"port": 5432, "db": "layba_dev", "notes": "volume layba-dev_pgdata"},
+    "redis": {"port": 6379},
+    "minio": {"api": 9000, "console": 9001, "bucket": "TBD"},
+    "mailhog": {"ui": 8025}
+  },
+  "contracts": {
+    "live": "GET /api/schema",
+    "artifact": "shared/contracts/openapi.yaml",
+    "generators": {
+      "web": {"cmd": "cd frontend && pnpm run gen:api", "out": "frontend/src/api/schema.ts"},
+      "mobile": {"cmd": "cd mobile && pnpm run gen:api", "out": "mobile/src/api/schema.ts"}
+    }
+  },
+  "frontends": {
+    "web": {"framework": "next-app-router-ts", "health": "/healthz", "env": {"NEXT_PUBLIC_API_BASE_URL": "http://backend.localhost"}},
+    "mobile": {
+      "framework": "expo-ts",
+      "screens": ["Health"],
+      "i18n": ["en", "uk", "pl"],
+      "env": {"API_BASE_URL_MOBILE": {"android": "http://10.0.2.2:8000", "ios": "http://127.0.0.1:8000", "device": "http://<IP_PC>:8000"}}
+    }
+  },
+  "auth": {
+    "web": {"mode": "cookie_session", "csrf": "planned_stage0", "cors_credentials": true},
+    "mobile": {"mode": "jwt_planned", "refresh": "secure_store", "access": "memory"}
+  },
+  "security": {
+    "cors_allowed": ["frontend.localhost", "localhost:3000"],
+    "csrf": "enable_stage0",
+    "request_id": "propagate_clients_planned",
+    "rate_limits": "tbd"
+  },
+  "data": {
+    "db": "postgres",
+    "cache": "redis",
+    "queues": "tbd (celery/rq)",
+    "files": {"store": "minio", "bucket": "TBD", "cdn": "tbd"}
+  },
+  "observability": {"logs": "dev_console", "sentry": "planned", "otel": "planned"},
+  "delivery": {"ci_contract_gate": "planned_stage0", "releases": "future"},
+  "conventions": {"branching": ["feat/*","chore/*","docs/*"], "no_touch": ["infra/*","shared/contracts/openapi.yaml","core settings"]}
+}

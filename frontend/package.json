@@ -7,11 +7,12 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "gen:api": "openapi-typescript ../shared/contracts/openapi.yaml -o src/api/schema.ts"
+    "gen:api": "openapi-typescript ../shared/contracts/openapi.yaml -o src/api/schema.ts",
+    "gen:api:check": "test -f ../shared/contracts/openapi.yaml || (echo \"No openapi.yaml. Export it from BE first.\" && exit 1)"
   },
   "dependencies": {
-    "ky": "^1.10.0",
     "next": "15.5.4",
+    "openapi-fetch": "^0.10.6",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

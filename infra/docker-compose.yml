@@ -33,6 +33,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+
     ports:
       - "9000:9000"          # S3 API
       - "9001:9001"          # Console
@@ -43,19 +44,23 @@ services:
     image: mailhog/mailhog:latest
     restart: unless-stopped
     ports:
-      - "8025:8025"          # UI http://localhost:8025
+      - "8025:8025"   # веб-интерфейс
+      - "1025:1025"   # SMTP <-- ЭТО ГЛАВНОЕ
 
   traefik:
     image: traefik:v3.0
     restart: unless-stopped
     command:
       - "--api.dashboard=true"
-      - "--api.insecure=true"            # dev only; доступен на 127.0.0.1:8080
-      - "--providers.file.filename=/etc/traefik/dynamic.yml"
       - "--entrypoints.web.address=:80"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
+      # чтобы не мешал docker-provider со случайными лейблами:
+      - "--providers.docker=false"
+      - "--log.level=INFO"
     ports:
-      - "80:80"
-      - "127.0.0.1:8090:8080"
+        - "80:80"
+        - "8080:8080"
     volumes:
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
     depends_on:
