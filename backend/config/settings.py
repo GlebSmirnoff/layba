@@ -28,7 +28,12 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-not-secret")
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"
 
 
-ALLOWED_HOSTS = ["backend.localhost", "127.0.0.1", "localhost"]
+ALLOWED_HOSTS = [
+    "localhost", "127.0.0.1",
+    "backend.localhost", "frontend.localhost",
+    "host.docker.internal",  # <- важно для проверки из контейнеров
+]
+
 
 
 # Application definition
@@ -131,10 +136,14 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://frontend.localhost"]
+CSRF_TRUSTED_ORIGINS = [
+    "http://backend.localhost",
+    "http://frontend.localhost",
+    "http://localhost",
+    "http://127.0.0.1",
+]
 CORS_ALLOWED_ORIGINS = [
     "http://frontend.localhost",
-    "http://localhost:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True   # <-- добавь
 
@@ -150,6 +159,7 @@ REST_FRAMEWORK = {
         "phone_verify": "10/minute",
         "email_send_code": "5/hour",
         "email_confirm": "10/minute",
+        "social_login": "10/minute",
     },
 }
 # Dev hint for CALL method (optional)
@@ -174,8 +184,17 @@ LOGGING = {
 }
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "127.0.0.1")  # не "localhost", чтобы избежать IPv6
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "1025"))
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = False
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@layba.local")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = False   # важно: OFF
+EMAIL_USE_SSL = False   # важно: OFF
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@layba.dev")
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID", "")
+FACEBOOK_APP_SECRET = os.getenv("FACEBOOK_APP_SECRET", "")
+APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID", "")
+DEV_SOCIAL_MOCK = os.getenv("DEV_SOCIAL_MOCK", "0")

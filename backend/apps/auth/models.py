@@ -20,9 +20,10 @@ class PhoneVerificationCode(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        indexes = [
-            models.Index(fields=["phone_e164", "used", "created_at"]),
-        ]
+        indexes = [models.Index(fields=("phone_e164", "used", "created_at")), ]
+        ordering = ("-created_at",)
+
+
         ordering = ["-created_at"]
 
     def is_expired(self) -> bool:
@@ -44,10 +45,8 @@ class EmailVerificationCode(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
-        indexes = [
-            models.Index(fields=["email", "used", "created_at"]),
-        ]
-        ordering = ["-created_at"]
+        indexes = [models.Index(fields=("email", "used", "created_at")), ]
+        ordering = ("-created_at",)
 
     def is_expired(self) -> bool:
         return timezone.now() >= self.expires_at

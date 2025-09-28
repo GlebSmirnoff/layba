@@ -6,24 +6,30 @@ paths:
   /api/notifications/settings/:
     get:
       operationId: api_notifications_settings_retrieve
+      description: |-
+        GET/PUT /api/notifications/settings/
+        Доступ только модератору. Возвращаем/принимаем простой объект {email: bool, sms: bool}.
+        Хранения пока нет — echo/stub как в шаге 1–2.
       tags:
       - api
       security:
       - cookieAuth: []
-      - {}
       responses:
         '200':
-          description: No response body
+          description: Current moderator notification settings
     put:
       operationId: api_notifications_settings_update
+      description: |-
+        GET/PUT /api/notifications/settings/
+        Доступ только модератору. Возвращаем/принимаем простой объект {email: bool, sms: bool}.
+        Хранения пока нет — echo/stub как в шаге 1–2.
       tags:
       - api
       security:
       - cookieAuth: []
-      - {}
       responses:
         '200':
-          description: No response body
+          description: Updated moderator notification settings
   /api/schema:
     get:
       operationId: api_schema_retrieve
@@ -169,35 +175,17 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
-  /auth/../api/notifications/settings/:
-    get:
-      operationId: auth_.._api_notifications_settings_retrieve
-      tags:
-      - auth
-      security:
-      - cookieAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
-    put:
-      operationId: auth_.._api_notifications_settings_update
-      tags:
-      - auth
-      security:
-      - cookieAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
   /auth/csrf/:
     get:
       operationId: auth_csrf_retrieve
       tags:
       - auth
+      security:
+      - cookieAuth: []
+      - {}
       responses:
         '200':
-          description: No response body
+          description: Set CSRF cookie and return token
   /auth/email/confirm:
     post:
       operationId: auth_email_confirm_create
@@ -220,31 +208,7 @@ paths:
       - {}
       responses:
         '200':
-          description: OK
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '410':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
+          description: Authenticated
   /auth/email/send_code:
     post:
       operationId: auth_email_send_code_create
@@ -267,19 +231,7 @@ paths:
       - {}
       responses:
         '204':
-          description: No Content
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
+          description: Code issued
   /auth/phone/send_code:
     post:
       operationId: auth_phone_send_code_create
@@ -302,19 +254,7 @@ paths:
       - {}
       responses:
         '204':
-          description: No Content
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
+          description: Code issued
   /auth/phone/verify:
     post:
       operationId: auth_phone_verify_create
@@ -337,36 +277,26 @@ paths:
       - {}
       responses:
         '200':
-          description: OK
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '410':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
-        '429':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-          description: ''
+          description: Authenticated
   /auth/session/login:
     post:
       operationId: auth_session_login_create
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionLoginIn'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionLoginIn'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionLoginIn'
+      security:
+      - cookieAuth: []
+      - {}
       responses:
         '200':
           description: No response body
@@ -386,34 +316,105 @@ paths:
       operationId: auth_social_apple_create
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppleLoginIn'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AppleLoginIn'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AppleLoginIn'
+        required: true
       security:
       - cookieAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
   /auth/social/facebook:
     post:
       operationId: auth_social_facebook_create
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacebookLoginIn'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FacebookLoginIn'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FacebookLoginIn'
+        required: true
       security:
       - cookieAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
   /auth/social/google:
     post:
       operationId: auth_social_google_create
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleLoginIn'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GoogleLoginIn'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GoogleLoginIn'
       security:
       - cookieAuth: []
       - {}
       responses:
         '200':
-          description: No response body
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
   /profile/me:
     get:
       operationId: profile_me_retrieve
@@ -423,9 +424,22 @@ paths:
       - cookieAuth: []
       responses:
         '200':
-          description: No response body
+          description: Authenticated profile
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: ''
 components:
   schemas:
+    AppleLoginIn:
+      type: object
+      properties:
+        id_token:
+          type: string
+      required:
+      - id_token
     EmailConfirmIn:
       type: object
       properties:
@@ -434,8 +448,6 @@ components:
           format: email
         code:
           type: string
-          maxLength: 6
-          minLength: 6
       required:
       - code
       - email
@@ -469,6 +481,24 @@ components:
       required:
       - code
       - message
+    FacebookLoginIn:
+      type: object
+      properties:
+        access_token:
+          type: string
+      required:
+      - access_token
+    GoogleLoginIn:
+      type: object
+      properties:
+        code:
+          type: string
+        redirect_uri:
+          type: string
+        code_verifier:
+          type: string
+        id_token:
+          type: string
     MethodEnum:
       enum:
       - sms
@@ -483,9 +513,10 @@ components:
         phone:
           type: string
         method:
-          $ref: '#/components/schemas/MethodEnum'
+          allOf:
+          - $ref: '#/components/schemas/MethodEnum'
+          default: sms
       required:
-      - method
       - phone
     PhoneVerifyIn:
       type: object
@@ -494,11 +525,32 @@ components:
           type: string
         code:
           type: string
+          nullable: true
         last4:
           type: string
-          maxLength: 4
+          nullable: true
       required:
       - phone
+    RoleEnum:
+      enum:
+      - user
+      - moderator
+      type: string
+      description: |-
+        * `user` - user
+        * `moderator` - moderator
+    SessionLoginIn:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/RoleEnum'
   securitySchemes:
     cookieAuth:
       type: apiKey

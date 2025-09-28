@@ -1,12 +1,12 @@
-"use client";
-import ProtectedRoute from "@/routes/ProtectedRoute";
+'use client';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function DashboardPage() {
   return (
     <ProtectedRoute>
-      <main className="p-8">
-        <h1 className="text-2xl font-semibold">Dashboard (stub)</h1>
-        <p className="mt-2 text-sm opacity-70">Вы авторизованы. Дальше прикрутим формы входа.</p>
+      <main style={{ padding: 24 }}>
+        <h1>Dashboard (stub)</h1>
+        <p>Вы авторизованы. Дальше прикрутим формы входа.</p>
       </main>
     </ProtectedRoute>
   );

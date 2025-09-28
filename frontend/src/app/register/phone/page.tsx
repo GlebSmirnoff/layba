@@ -1,51 +1,78 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { getCsrf, sendPhoneCode } from "@/services/authService";
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { api } from '@/api/client';
 
 export default function RegisterPhonePage() {
-  const [phone, setPhone] = useState("+380000000000");
-  const [method, setMethod] = useState<"sms" | "call">("sms");
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const [phone, setPhone] = useState('+380000000000');
+  const [method, setMethod] = useState<'sms' | 'call'>('sms');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setErr(null);
+    setLoading(true);
     try {
-      await getCsrf();
-      const res = await sendPhoneCode({ phone, method });
-      if (res.response.ok) {
-        router.push(`/register/phone/verify?phone=${encodeURIComponent(phone)}&method=${method}`);
-      } else {
-        const data = await res.response.json().catch(() => ({}));
-        setError(data?.message ?? "Failed to send code");
+      // получаем CSRF (если нужно для DRF)
+      await api.GET('/auth/csrf/');
+
+      const { error } = await api.POST('/auth/phone/send_code', {
+        body: { phone, method },
+      });
+      if (error) {
+        // error уже типизирован из схемы
+        setErr(error.data?.message ?? 'Не удалось отправить код');
+        return;
       }
-    } catch (err) {
-      setError(String(err));
+
+      // переходим на ввод кода
+      const q = new URLSearchParams({ phone, method });
+      router.push(`/register/phone/verify?${q}`);
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <main className="p-8">
-      <h1>Phone login</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-3 max-w-md">
-        <label>
-          Phone (E.164)
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} className="border p-2 w-full" />
-        </label>
+    <main style={{ padding: 24 }}>
+      <h1>Phone registration</h1>
+      <form onSubmit={onSubmit}>
+        <div>
+          <label>Phone (E.164): </label>
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+380..."
+          />
+        </div>
 
-        <label>
-          Method
-          <select value={method} onChange={(e) => setMethod(e.target.value as any)} className="border p-2 w-full">
-            <option value="sms">SMS (6 digits)</option>
-            <option value="call">Call (last 4)</option>
-          </select>
-        </label>
+        <div style={{ marginTop: 8 }}>
+          <label>
+            <input
+              type="radio"
+              checked={method === 'sms'}
+              onChange={() => setMethod('sms')}
+            />
+            SMS
+          </label>
+          <label style={{ marginLeft: 12 }}>
+            <input
+              type="radio"
+              checked={method === 'call'}
+              onChange={() => setMethod('call')}
+            />
+            Call (last4)
+          </label>
+        </div>
 
-        <button className="border p-2" type="submit">Send</button>
-        {error && <p className="text-red-600">{error}</p>}
+        <button disabled={loading} style={{ marginTop: 12 }}>
+          {loading ? 'Отправляю...' : 'Отправить код'}
+        </button>
+
+        {err && <p style={{ color: 'crimson' }}>{err}</p>}
       </form>
     </main>
   );

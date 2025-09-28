@@ -1,7 +1,4 @@
-﻿import ky from "ky";
+﻿import createClient from 'openapi-fetch';
+import type { paths } from './schema';
 
-export const api = ky.create({
-  prefixUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://backend.localhost",
-  credentials: "include",
-  headers: { "Content-Type": "application/json" },
-});
+export const api = createClient<paths>({ baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL });

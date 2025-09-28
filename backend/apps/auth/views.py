@@ -17,9 +17,9 @@ from .serializers import (
     EmailSendCodeIn,
     EmailConfirmIn,
     SessionLoginIn,
-    SocialGoogleIn,
-    SocialFacebookIn,
-    SocialAppleIn,
+    GoogleLoginIn,
+    FacebookLoginIn,
+    AppleLoginIn,
     ErrorSerializer,
 )
 from .services import (
@@ -27,20 +27,15 @@ from .services import (
     verify_phone_code,
     issue_email_code,
     confirm_email_code,
+    google_exchange_code, google_verify_id_token,
+    facebook_verify_access_token, apple_verify_id_token,
+    find_or_create_user_from_social, issue_session_for,
 )
 
 
 # ---------- helpers ----------
 def _error(code: str, message: str, details=None, status_code=status.HTTP_400_BAD_REQUEST):
-    return Response(
-        {
-            "code": code,
-            "message": message,
-            "details": details or {},
-            "request_id": "",
-        },
-        status=status_code,
-    )
+    return Response({"code": code, "message": message, "details": details or {}, "request_id": ""}, status=status_code)
 
 
 def _set_session_user(request, user_dict: dict):
@@ -81,6 +76,39 @@ class ProfileMeView(APIView):
         if not user:
             return _error("forbidden", "Authentication required", status_code=status.HTTP_403_FORBIDDEN)
         return Response(user)
+
+# --- permissions ---
+class IsModerator(BasePermission):
+    def has_permission(self, request, view):
+        user = request.session.get("user")
+        return bool(user) and user.get("role") == "moderator"
+
+
+# --- moderator notifications settings (stub) ---
+class ModeratorNotificationSettingsView(APIView):
+    """
+    GET/PUT /api/notifications/settings/
+    Доступ только модератору. Возвращаем/принимаем простой объект {email: bool, sms: bool}.
+    Хранения пока нет — echo/stub как в шаге 1–2.
+    """
+    permission_classes = [IsModerator]
+
+    @extend_schema(
+        responses={200: OpenApiResponse(description="Current moderator notification settings")},
+    )
+    def get(self, request):
+        # Статический stub (как договаривались раньше)
+        return Response({"email": True, "sms": False})
+
+    @extend_schema(
+        request=None,
+        responses={200: OpenApiResponse(description="Updated moderator notification settings")},
+    )
+    def put(self, request):
+        data = request.data or {}
+        email = bool(data.get("email", True))
+        sms = bool(data.get("sms", False))
+        return Response({"email": email, "sms": sms})
 
 
 # ---------- SESSION (demo) ----------
@@ -211,3 +239,86 @@ class EmailConfirmView(APIView):
 
         _set_session_user(request, user)
         return Response(user)
+
+class SocialGoogleView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "social_login"
+
+    @extend_schema(
+        request=GoogleLoginIn,
+        responses={200: OpenApiResponse(description="OK"), 401: ErrorSerializer, 400: ErrorSerializer},
+    )
+    def post(self, request):
+        ser = GoogleLoginIn(data=request.data)
+        if not ser.is_valid():
+            return _error("validation_error", "Invalid payload", ser.errors)
+
+        code = ser.validated_data.get("code")
+        id_token = ser.validated_data.get("id_token")
+        redirect_uri = ser.validated_data.get("redirect_uri")
+        code_verifier = ser.validated_data.get("code_verifier")
+
+        try:
+            if id_token:
+                payload = google_verify_id_token(id_token)
+            elif code:
+                tokens = google_exchange_code(code, redirect_uri, code_verifier)
+                payload = google_verify_id_token(tokens["id_token"])
+            else:
+                return _error("validation_error", "Either code or id_token must be provided")
+        except NotImplementedError as e:
+            return _error("not_implemented", str(e), status_code=status.HTTP_501_NOT_IMPLEMENTED)
+        except Exception:
+            return _error("unauthorized", "Invalid Google token", status_code=status.HTTP_401_UNAUTHORIZED)
+
+        user = find_or_create_user_from_social(payload, "google")
+        issue_session_for(request, user)
+        return Response(user, status=status.HTTP_200_OK)
+
+# --- FACEBOOK ---
+class SocialFacebookView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "social_login"
+
+    @extend_schema(
+        request=FacebookLoginIn,
+        responses={200: OpenApiResponse(description="OK"), 401: ErrorSerializer, 400: ErrorSerializer},
+    )
+    def post(self, request):
+        ser = FacebookLoginIn(data=request.data)
+        if not ser.is_valid():
+            return _error("validation_error", "Invalid payload", ser.errors)
+        try:
+            payload = facebook_verify_access_token(ser.validated_data["access_token"])
+        except NotImplementedError as e:
+            return _error("not_implemented", str(e), status_code=status.HTTP_501_NOT_IMPLEMENTED)
+        except Exception:
+            return _error("unauthorized", "Invalid Facebook token", status_code=status.HTTP_401_UNAUTHORIZED)
+
+        user = find_or_create_user_from_social(payload, "facebook")
+        issue_session_for(request, user)
+        return Response(user, status=status.HTTP_200_OK)
+
+# --- APPLE ---
+class SocialAppleView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "social_login"
+
+    @extend_schema(
+        request=AppleLoginIn,
+        responses={200: OpenApiResponse(description="OK"), 401: ErrorSerializer, 400: ErrorSerializer},
+    )
+    def post(self, request):
+        ser = AppleLoginIn(data=request.data)
+        if not ser.is_valid():
+            return _error("validation_error", "Invalid payload", ser.errors)
+        try:
+            payload = apple_verify_id_token(ser.validated_data["id_token"])
+        except NotImplementedError as e:
+            return _error("not_implemented", str(e), status_code=status.HTTP_501_NOT_IMPLEMENTED)
+        except Exception:
+            return _error("unauthorized", "Invalid Apple token", status_code=status.HTTP_401_UNAUTHORIZED)
+
+        user = find_or_create_user_from_social(payload, "apple")
+        issue_session_for(request, user)
+        return Response(user, status=status.HTTP_200_OK)

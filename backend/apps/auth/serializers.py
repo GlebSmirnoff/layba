@@ -44,13 +44,16 @@ class SessionLoginIn(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     role = serializers.ChoiceField(choices=["user", "moderator"], required=False)
 
-class SocialGoogleIn(serializers.Serializer):
-    code = serializers.CharField()
+class GoogleLoginIn(serializers.Serializer):
+    code = serializers.CharField(required=False, allow_blank=True)
+    redirect_uri = serializers.CharField(required=False, allow_blank=True)
+    code_verifier = serializers.CharField(required=False, allow_blank=True)
+    id_token = serializers.CharField(required=False, allow_blank=True)
 
-class SocialFacebookIn(serializers.Serializer):
+class FacebookLoginIn(serializers.Serializer):
     access_token = serializers.CharField()
 
-class SocialAppleIn(serializers.Serializer):
+class AppleLoginIn(serializers.Serializer):
     id_token = serializers.CharField()
 
 class ErrorSerializer(serializers.Serializer):
