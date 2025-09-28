@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "health",
+    "apps.auth"
 ]
 
 MIDDLEWARE = [
@@ -134,11 +135,20 @@ CORS_ALLOWED_ORIGINS = [
     "http://frontend.localhost",
     "http://localhost:3000",
 ]
+CORS_ALLOW_CREDENTIALS = True   # <-- добавь
 
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
 # DRF + OpenAPI
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {
+        "phone_send_code": "5/hour",
+        "email_send_code": "5/hour",
+    },
 }
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Layba API",
     "VERSION": "0.1.0",
